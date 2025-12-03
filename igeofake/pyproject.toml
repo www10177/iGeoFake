@@ -1,0 +1,11 @@
+[project]
+name = "igeofake"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.109.2",
+    "nicegui==1.4.26",
+    "pymobiledevice3>=6.1.6",
+]
