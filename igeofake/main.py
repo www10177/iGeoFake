@@ -16,6 +16,11 @@ clear_loc_btn = None
 coord_input = None
 map_element = None
 map_marker = None
+# Route UI Elements
+gpx_upload = None
+play_route_btn = None
+noise_input = None
+uploaded_gpx_path = None
 
 def on_log(message: str):
     """Callback for appending logs."""
@@ -35,6 +40,7 @@ def on_status_change(new_state: str):
             stop_btn.disable()
             set_loc_btn.disable()
             clear_loc_btn.disable()
+            if play_route_btn: play_route_btn.disable()
 
         elif new_state == STATE_TUNNEL_A_RUNNING:
             status_label.classes('text-yellow-500')
@@ -43,6 +49,7 @@ def on_status_change(new_state: str):
             stop_btn.enable()
             set_loc_btn.disable()
             clear_loc_btn.disable()
+            if play_route_btn: play_route_btn.disable()
 
         elif new_state == STATE_STARTING:
             status_label.classes('text-yellow-500')
@@ -51,6 +58,7 @@ def on_status_change(new_state: str):
             stop_btn.enable()
             set_loc_btn.disable()
             clear_loc_btn.disable()
+            if play_route_btn: play_route_btn.disable()
 
         elif new_state == STATE_CONNECTED:
             status_label.classes('text-green-500')
@@ -59,6 +67,7 @@ def on_status_change(new_state: str):
             stop_btn.enable()
             set_loc_btn.enable()
             clear_loc_btn.enable()
+            if play_route_btn and uploaded_gpx_path: play_route_btn.enable()
 
         elif new_state == STATE_SIMULATING:
             status_label.classes('text-blue-500')
@@ -67,6 +76,7 @@ def on_status_change(new_state: str):
             stop_btn.enable()
             set_loc_btn.enable()
             clear_loc_btn.enable()
+            if play_route_btn and uploaded_gpx_path: play_route_btn.enable()
 
         elif new_state == STATE_ERROR:
             status_label.classes('text-red-500')
@@ -75,6 +85,7 @@ def on_status_change(new_state: str):
             stop_btn.disable()
             set_loc_btn.disable()
             clear_loc_btn.disable()
+            if play_route_btn: play_route_btn.disable()
 
 async def handle_start_tunnel_a():
     await manager.start_tunnel_a()
@@ -105,6 +116,33 @@ async def handle_set_location():
 
 async def handle_clear_location():
     await manager.clear_location()
+
+async def handle_play_route():
+    if not uploaded_gpx_path:
+        ui.notify('Please upload a GPX file first.', type='warning')
+        return
+    noise_val = noise_input.value if noise_input.value else 500
+    await manager.play_route(uploaded_gpx_path, str(int(noise_val)))
+
+def handle_upload(e):
+    global uploaded_gpx_path
+    try:
+        # Save uploaded file
+        name = e.name
+        content = e.content.read()
+        # Save to local directory
+        # We can just save it as 'route.gpx' or keep original name
+        # Let's save as 'uploaded_route.gpx' to keep it simple and overwrite previous
+        uploaded_gpx_path = 'uploaded_route.gpx'
+        with open(uploaded_gpx_path, 'wb') as f:
+            f.write(content)
+
+        ui.notify(f'Uploaded {name}')
+        if manager.state in [STATE_CONNECTED, STATE_SIMULATING]:
+            play_route_btn.enable()
+
+    except Exception as ex:
+        ui.notify(f'Error uploading file: {ex}', type='negative')
 
 def update_map_from_input():
     lat, lon = parse_coordinates(coord_input.value)
@@ -140,6 +178,7 @@ def handle_map_click(e):
 @ui.page('/')
 def main_page():
     global log_area, status_label, btn_tunnel_a, btn_tunnel_b, stop_btn, set_loc_btn, clear_loc_btn, coord_input, manager, map_element, map_marker
+    global gpx_upload, play_route_btn, noise_input
 
     # Initialize Manager
     if not manager:
@@ -176,6 +215,26 @@ def main_page():
             set_loc_btn.disable()
             clear_loc_btn = ui.button('Clear Location', on_click=handle_clear_location).props('outline')
             clear_loc_btn.disable()
+
+        # Route Simulation
+        ui.label('Route Simulation (GPX)').classes('font-bold mt-4')
+        with ui.row().classes('w-full gap-4 items-center'):
+            gpx_upload = ui.upload(
+                label='Upload GPX',
+                on_upload=handle_upload,
+                max_files=1,
+                auto_upload=True
+            ).props('accept=.gpx').classes('w-64')
+
+            noise_input = ui.number(
+                label='Timing Noise (ms)',
+                value=500,
+                min=0,
+                max=5000
+            ).classes('w-40')
+
+            play_route_btn = ui.button('Play Route', on_click=handle_play_route)
+            play_route_btn.disable()
 
         # Map
         with ui.card().classes('w-full h-96 mt-4 p-0'):
