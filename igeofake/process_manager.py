@@ -189,6 +189,35 @@ class ProcessManager:
         except Exception as e:
             self.log(f"ERROR setting location: {e}")
 
+    async def play_route(self, gpx_path: str, noise: str):
+        if not self.rsd_ip or not self.rsd_port:
+            self.log("ERROR: RSD Connection info not found yet.")
+            return
+
+        # Check and kill existing Sim process
+        if self.proc_sim:
+            old_proc = self.proc_sim
+            self.proc_sim = None # Detach first so _wait_for_exit ignores it
+            self.log("Stopping previous simulation process...")
+            await self._kill_process(old_proc)
+
+        try:
+            cmd_play = self._get_command("play", self.rsd_ip, self.rsd_port, gpx_path, noise)
+            self.log(f"Playing Route: {' '.join(cmd_play)}")
+
+            self.proc_sim = await asyncio.create_subprocess_exec(
+                *cmd_play,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT
+            )
+            asyncio.create_task(self._read_stream(self.proc_sim.stdout, "Simulate"))
+            asyncio.create_task(self._wait_for_exit(self.proc_sim, "Simulate"))
+
+            self.set_state(STATE_SIMULATING)
+
+        except Exception as e:
+            self.log(f"ERROR playing route: {e}")
+
     async def clear_location(self):
         # Kill existing simulation first
         if self.proc_sim:
@@ -273,6 +302,8 @@ class ProcessManager:
                 return base + ["tunnel_b"]
             elif cmd_type == "set_location":
                 return base + ["set_location", "--", args[2], args[3]]
+            elif cmd_type == "play":
+                 return base + ["play", "--", args[2], args[3]]
             elif cmd_type == "clear_location":
                 return base + ["clear_location"]
         else:
@@ -286,6 +317,13 @@ class ProcessManager:
                     "pymobiledevice3", "developer", "dvt", "simulate-location", "set",
                     "--rsd", rsd_ip, rsd_port,
                     "--", lat, lon
+                ]
+            elif cmd_type == "play":
+                rsd_ip, rsd_port, gpx_path, noise = args
+                return [
+                    "pymobiledevice3", "developer", "dvt", "simulate-location", "play",
+                    "--rsd", rsd_ip, rsd_port,
+                    "--", gpx_path, noise
                 ]
             elif cmd_type == "clear_location":
                 return ["pymobiledevice3", "developer", "dvt", "simulate-location", "clear"]

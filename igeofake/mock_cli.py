@@ -36,6 +36,15 @@ def mock_set_location(lat, lon):
     while True:
         time.sleep(1)
 
+def mock_play(gpx_path, noise):
+    print(f"Playing route from: {gpx_path}")
+    print(f"Timing noise: {noise}ms")
+    print("Press ENTER to exit>\\")
+    sys.stdout.flush()
+    # Simulate blocking process
+    while True:
+        time.sleep(1)
+
 def mock_clear_location():
     print("Clearing location...")
     time.sleep(1)
@@ -80,6 +89,21 @@ def main():
         except Exception as e:
             print(f"Error parsing args: {e}")
             mock_set_location("0.0", "0.0")
+
+    elif mode == "play":
+        # args expected: -- <GPX_PATH> <NOISE>
+        try:
+            if '--' in sys.argv:
+                dash_index = sys.argv.index('--')
+                gpx_path = sys.argv[dash_index+1]
+                noise = sys.argv[dash_index+2]
+            else:
+                gpx_path = "unknown.gpx"
+                noise = "500"
+            mock_play(gpx_path, noise)
+        except Exception as e:
+            print(f"Error parsing args: {e}")
+            mock_play("unknown.gpx", "500")
 
     elif mode == "clear_location":
         mock_clear_location()
