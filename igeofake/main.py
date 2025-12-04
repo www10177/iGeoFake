@@ -137,6 +137,19 @@ def handle_map_click(e):
         if manager:
             manager.log(f"ERROR in handle_map_click: {ex}, args: {e.args}")
 
+def handle_marker_drag(e):
+    """Handle marker drag events from JavaScript"""
+    try:
+        lat = e.args['lat']
+        lng = e.args['lng']
+        coord_input.value = f"{lat:.6f}, {lng:.6f}"
+        if manager:
+            manager.log(f"DEBUG: Marker dragged to {lat:.6f}, {lng:.6f}")
+    except Exception as ex:
+        if manager:
+            manager.log(f"ERROR in handle_marker_drag: {ex}, args: {e.args}")
+
+
 @ui.page('/')
 def main_page():
     global log_area, status_label, btn_tunnel_a, btn_tunnel_b, stop_btn, set_loc_btn, clear_loc_btn, coord_input, manager, map_element, map_marker
@@ -180,9 +193,22 @@ def main_page():
         # Map
         with ui.card().classes('w-full h-96 mt-4 p-0'):
             map_element = ui.leaflet(center=(25.0330, 121.5654), zoom=13).classes('w-full h-full')
-            map_marker = map_element.marker(latlng=(25.0330, 121.5654))
-            map_element.on('map-click', handle_map_click)
+            map_marker = map_element.marker(latlng=(25.0330, 121.5654), options={'draggable': True})
             map_element.on('marker-drag', handle_marker_drag)
+            
+            # Bind dragend event using external JavaScript file
+            map_id = map_element.id
+            
+            # Add the JavaScript file to the page
+            ui.add_head_html('<script src="/static/marker_drag.js"></script>')
+            
+            # Call the function after a delay to ensure everything is loaded
+            def bind_drag_events():
+                if manager:
+                    manager.log(f"DEBUG: Calling bindMarkerDragEvents for map ID: {map_id}")
+                ui.run_javascript(f'bindMarkerDragEvents({map_id});')
+            
+            ui.timer(0.5, bind_drag_events, once=True)
 
         ui.label('Process Logs:').classes('font-bold mt-4')
         log_area = ui.log(max_lines=1000).classes('w-full h-64 border p-2 bg-gray-100 font-mono text-sm')
@@ -191,7 +217,23 @@ def main_page():
     on_status_change(manager.state)
 
 def run():
+    from pathlib import Path
+    # Mount static files directory
+    app.add_static_files('/static', Path(__file__).parent / 'static')
     ui.run(title='iGeoFake', reload=False, port=8080)
 
 if __name__ in {"__main__", "__mp_main__"}:
+    import argparse
+    import os
+    
+    parser = argparse.ArgumentParser(description='iGeoFake - iOS Location Simulator')
+    parser.add_argument('--mock', action='store_true', 
+                        help='Run in mock mode (no admin required, for development/testing)')
+    args = parser.parse_args()
+    
+    if args.mock:
+        os.environ['IGEOFAKE_MOCK'] = '1'
+        print("Running in MOCK MODE - no admin required")
+    
     run()
+
