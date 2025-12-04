@@ -10,6 +10,7 @@ from typing import Callable, Optional
 # Constants for State
 STATE_STOPPED = "Stopped"
 STATE_STARTING = "Starting"
+STATE_TUNNEL_A_RUNNING = "Tunnel A Running"
 STATE_CONNECTED = "Connected (RSD Found)"
 STATE_SIMULATING = "Simulating..."
 STATE_ERROR = "Error"
@@ -59,15 +60,19 @@ class ProcessManager:
             if line:
                 self.log(f"[{process_name}] {line}")
 
-                if rsd_parser and not self.rsd_ip:
+                if rsd_parser:
                     # Regex: Use the follow connection option: --rsd ([a-f0-9:]+) (\d+)
                     match = re.search(r'--rsd\s+([a-f0-9:]+)\s+(\d+)', line)
                     if match:
-                        self.rsd_ip = match.group(1)
-                        self.rsd_port = match.group(2)
-                        self.log(f"SUCCESS: RSD Found - IP: {self.rsd_ip}, Port: {self.rsd_port}")
-                        if self.state != STATE_SIMULATING:
-                            self.set_state(STATE_CONNECTED)
+                        new_ip = match.group(1)
+                        new_port = match.group(2)
+                        
+                        if new_ip != self.rsd_ip or new_port != self.rsd_port:
+                            self.rsd_ip = new_ip
+                            self.rsd_port = new_port
+                            self.log(f"SUCCESS: RSD Updated - IP: {self.rsd_ip}, Port: {self.rsd_port}")
+                            if self.state != STATE_SIMULATING:
+                                self.set_state(STATE_CONNECTED)
 
     async def _wait_for_exit(self, proc, name):
         """Waits for process exit and handles errors."""
@@ -91,7 +96,7 @@ class ProcessManager:
                  self.log(f"ERROR: {name} exited unexpectedly with code {proc.returncode}")
                  self.set_state(STATE_ERROR)
 
-    async def start_services(self):
+    async def start_tunnel_a(self):
         if self.state != STATE_STOPPED and self.state != STATE_ERROR:
             self.log("Services already running or starting.")
             return
@@ -104,31 +109,54 @@ class ProcessManager:
             # 1. Start Tunnel A
             cmd_a = self._get_command("tunnel_a")
             self.log(f"Starting Tunnel A: {' '.join(cmd_a)}")
+            
+            # Force unbuffered output
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+
             self.proc_tunnel_a = await asyncio.create_subprocess_exec(
                 *cmd_a,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stderr=asyncio.subprocess.STDOUT,
+                env=env
             )
             asyncio.create_task(self._read_stream(self.proc_tunnel_a.stdout, "Tunnel A"))
             asyncio.create_task(self._wait_for_exit(self.proc_tunnel_a, "Tunnel A"))
+            
+            self.set_state(STATE_TUNNEL_A_RUNNING)
 
-            # Wait 2 seconds
-            self.log("Waiting 2 seconds before starting Tunnel B...")
-            await asyncio.sleep(2)
+        except Exception as e:
+            self.log(f"CRITICAL ERROR starting Tunnel A: {e}")
+            self.set_state(STATE_ERROR)
+            await self.stop_services()
 
+    async def start_tunnel_b(self):
+        if self.state != STATE_TUNNEL_A_RUNNING:
+            self.log("Tunnel A must be running before starting Tunnel B.")
+            return
+
+        self.set_state(STATE_STARTING)
+
+        try:
             # 2. Start Tunnel B
             cmd_b = self._get_command("tunnel_b")
             self.log(f"Starting Tunnel B: {' '.join(cmd_b)}")
+            
+            # Force unbuffered output
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+
             self.proc_tunnel_b = await asyncio.create_subprocess_exec(
                 *cmd_b,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stderr=asyncio.subprocess.STDOUT,
+                env=env
             )
             asyncio.create_task(self._read_stream(self.proc_tunnel_b.stdout, "Tunnel B", rsd_parser=True))
             asyncio.create_task(self._wait_for_exit(self.proc_tunnel_b, "Tunnel B"))
 
         except Exception as e:
-            self.log(f"CRITICAL ERROR starting services: {e}")
+            self.log(f"CRITICAL ERROR starting Tunnel B: {e}")
             self.set_state(STATE_ERROR)
             await self.stop_services()
 
