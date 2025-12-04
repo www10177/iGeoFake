@@ -7,5 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.109.2",
     "nicegui==1.4.26",
+    "pyinstaller>=6.17.0",
     "pymobiledevice3>=6.1.6",
 ]

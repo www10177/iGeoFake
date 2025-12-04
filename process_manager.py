@@ -307,24 +307,36 @@ class ProcessManager:
             elif cmd_type == "clear_location":
                 return base + ["clear_location"]
         else:
+            # Determine the executable path
+            if getattr(sys, 'frozen', False):
+                # Running in PyInstaller bundle
+                # Executable is in the same directory as the main executable
+                base_path = os.path.dirname(sys.executable)
+                pmd3_exe = os.path.join(base_path, "pymobiledevice3")
+                if sys.platform == "win32":
+                    pmd3_exe += ".exe"
+            else:
+                # Running from source, rely on PATH or venv
+                pmd3_exe = "pymobiledevice3"
+
             if cmd_type == "tunnel_a":
-                return ["pymobiledevice3", "remote", "tunneld"]
+                return [pmd3_exe, "remote", "tunneld"]
             elif cmd_type == "tunnel_b":
-                return ["pymobiledevice3", "lockdown", "start-tunnel"]
+                return [pmd3_exe, "lockdown", "start-tunnel"]
             elif cmd_type == "set_location":
                 rsd_ip, rsd_port, lat, lon = args
                 return [
-                    "pymobiledevice3", "developer", "dvt", "simulate-location", "set",
+                    pmd3_exe, "developer", "dvt", "simulate-location", "set",
                     "--rsd", rsd_ip, rsd_port,
                     "--", lat, lon
                 ]
             elif cmd_type == "play":
                 rsd_ip, rsd_port, gpx_path, noise = args
                 return [
-                    "pymobiledevice3", "developer", "dvt", "simulate-location", "play",
+                    pmd3_exe, "developer", "dvt", "simulate-location", "play",
                     "--rsd", rsd_ip, rsd_port,
                     "--", gpx_path, noise
                 ]
             elif cmd_type == "clear_location":
-                return ["pymobiledevice3", "developer", "dvt", "simulate-location", "clear"]
+                return [pmd3_exe, "developer", "dvt", "simulate-location", "clear"]
         return []

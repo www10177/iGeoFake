@@ -11,7 +11,7 @@
 ## 系統需求
 
 * Windows 10 或 Windows 11
-* Python 3.11+
+* Python 3.12+
 * [uv](https://github.com/astral-sh/uv) 套件管理器
 * iTunes 或 Apple Drivers (確保 Windows 能識別 iOS 裝置)
 
@@ -41,6 +41,21 @@
    ```
 
 4. 瀏覽器應會自動開啟，顯示 iGeoFake 操作介面。
+
+## 封裝成 Windows 執行檔 (.exe)
+
+若需要將此專案封裝成無需安裝 Python 的獨立執行檔：
+
+1. 確保已安裝依賴：
+   ```powershell
+   uv sync
+   ```
+2. 執行封裝腳本：
+   ```powershell
+   uv run build.py
+   ```
+3. 完成後，執行檔將位於 `dist/iGeoFake/iGeoFake.exe`。
+   * 請將整個 `dist/iGeoFake` 資料夾複製到目標電腦使用，切勿只複製 exe 檔案。
 
 ## 操作說明
 
