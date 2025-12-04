@@ -98,13 +98,16 @@ def main_page():
 
         with ui.row().classes('w-full gap-4'):
             start_btn = ui.button('Start Services', on_click=handle_start)
-            stop_btn = ui.button('Stop Services', on_click=handle_stop).props('color=red').set_enabled(False)
+            stop_btn = ui.button('Stop Services', on_click=handle_stop).props('color=red')
+            stop_btn.set_enabled(False)
 
         with ui.row().classes('w-full gap-4 mt-4 items-center'):
             lat_input = ui.number(label='Latitude', value=25.0330, format='%.6f', step=0.0001).classes('w-32')
             lon_input = ui.number(label='Longitude', value=121.5654, format='%.6f', step=0.0001).classes('w-32')
-            set_loc_btn = ui.button('Set Location', on_click=handle_set_location).set_enabled(False)
-            clear_loc_btn = ui.button('Clear Location', on_click=handle_clear_location).props('outline').set_enabled(False)
+            set_loc_btn = ui.button('Set Location', on_click=handle_set_location)
+            set_loc_btn.set_enabled(False)
+            clear_loc_btn = ui.button('Clear Location', on_click=handle_clear_location).props('outline')
+            clear_loc_btn.set_enabled(False)
 
         ui.label('Process Logs:').classes('font-bold mt-4')
         log_area = ui.log(max_lines=1000).classes('w-full h-64 border p-2 bg-gray-100 font-mono text-sm')
